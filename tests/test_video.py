@@ -460,9 +460,9 @@ def test_avatar_build_modes(tmp_path, monkeypatch):
     off = VideoConfig(enabled=False, image=str(p))
     assert Avatar.build(off) is None
     st = Avatar.build(VideoConfig(mode="static", image=str(p)))
-    assert isinstance(st.source, StaticPortrait) and st.wrap_sink("inner") == "inner"
+    assert isinstance(st.source.inner, StaticPortrait) and st.wrap_sink("inner") == "inner"
     an = Avatar.build(VideoConfig(image=str(p), lipsync_url="ws://127.0.0.1:9/v1/lipsync"))
-    assert isinstance(an.source, Compositor) and an.client is not None
+    assert isinstance(an.source.inner, Compositor) and an.client is not None
     assert Avatar.build(VideoConfig(image=str(tmp_path / "none.png"))) is None
     monkeypatch.setenv("SKCALL_VIDEO", "0")
     monkeypatch.setenv("SKCALL_LIPSYNC_URL", "ws://x:1/v1/lipsync")
