@@ -1,0 +1,38 @@
+# Example unit: the agent joins one Nextcloud Talk room's call.
+#
+#   systemctl --user start skcall-join@<room>    # join (returns at once)
+#   systemctl --user stop  skcall-join@<room>    # leave (SIGINT: clean leave)
+#
+# Needs the skcall venv at ~/skcall/.venv (bash sk/setup.sh in the export).
+# Required keys, in ~/.config/skcall/skcall.env or join.env:
+#   SKCALL_NC_URL=<your Nextcloud URL>
+#   SKCALL_ALLOWED_ROOMS=<room tokens>   or   SKCALL_OPERATORS=<Talk user ids>
+# Talk login (required), in skcall.env or join.env:
+#   NEXTCLOUD_TALK_USERNAME=<agent user>
+#   NEXTCLOUD_TALK_APP_PASSWORD=<app password>
+# Per-call options (ring, greeting) go in $XDG_RUNTIME_DIR/skcall/join-<room>.env.
+#
+# Copy to ~/.config/systemd/user/ and run `systemctl --user daemon-reload`.
+# Never enable it: it is started on demand. Deploy templates live in the
+# sidekick-release repo (smilinTux/sidekick-release).
+
+[Unit]
+Description=skcall: agent in the Nextcloud Talk call of room %i
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+EnvironmentFile=%h/.config/skcall/skcall.env
+EnvironmentFile=-%h/.config/skcall/join.env
+EnvironmentFile=-%t/skcall/join-%i.env
+Environment=SKCALL_VIDEO_MODE=animated
+Environment=SKCALL_MAX_CALL_S=86400
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/skcall/.venv/bin/python -m skcall.cli join --room %i --wait 600
+Restart=no
+RuntimeMaxSec=86400
+SuccessExitStatus=3
+# SIGINT unwinds asyncio, so skcall leaves the call and room before exiting.
+KillSignal=SIGINT
+TimeoutStopSec=30

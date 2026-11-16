@@ -1,0 +1,6 @@
+# Versions the voice stack was tested with (the pins also live in pyproject's `voice` extra).
+skchat-sovereign==0.14.266
+skvoice==0.2.9
+skmemory==0.11.172
+mcp==1.30.0
+pyyaml==6.0.3

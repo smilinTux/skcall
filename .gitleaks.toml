@@ -1,0 +1,16 @@
+# gitleaks: the default rules, plus an allowlist for documentation values only.
+# Run: gitleaks dir . --config .gitleaks.toml
+title = "skcall gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "TEST-NET addresses (RFC 5737) and example.org, used in tests and docs"
+regexTarget = "match"
+regexes = [
+  '''\b192\.0\.2\.\d{1,3}\b''',
+  '''\b198\.51\.100\.\d{1,3}\b''',
+  '''\b203\.0\.113\.\d{1,3}\b''',
+  '''(?i)\b[a-z0-9.-]*example\.org\b''',
+]

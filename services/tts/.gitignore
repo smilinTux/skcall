@@ -1,0 +1,3 @@
+__pycache__/
+*.pyc
+sktts/_sktoken.py

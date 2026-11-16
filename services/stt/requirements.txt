@@ -1,0 +1,41 @@
+# skstt, faster-whisper (CTranslate2) server and dispatcher. This mirrors the
+# venv the server runs in on its reference host (pip freeze, Python 3.12),
+# plus httpx for the dispatcher. CTranslate2 finds CUDA 12 cuBLAS and cuDNN 9
+# from the system; with SKSTT_DEVICE=cpu it needs neither.
+# Tests do not need any of this: see requirements-test.txt.
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+av==19.0.1
+click==8.5.0
+ctranslate2==4.8.3
+fastapi==0.150.0
+faster-whisper==1.2.1
+filelock==4.2.4
+flatbuffers==25.12.19
+fsspec==2026.9.0
+h11==0.16.0
+hf-xet==1.7.0
+httpcore2==2.15.1
+httpx2==2.15.1
+huggingface_hub==2.2.0
+idna==3.20
+numpy==2.5.4
+onnxruntime==1.31.0
+opentelemetry-api==1.45.1
+packaging==26.3
+protobuf==7.36.2
+pydantic==2.14.1
+pydantic_core==2.50.1
+python-multipart==0.0.32
+PyYAML==6.0.3
+starlette==1.9.0
+tokenizers==0.23.3
+tqdm==4.70.1
+truststore==0.10.5
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+uvicorn==0.44.0
+certifi==2026.4.22
+httpcore==1.0.9
+httpx==0.28.1

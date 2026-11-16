@@ -1,0 +1,4 @@
+[submodule "services/lipsync/third_party/MuseTalk"]
+	path = services/lipsync/third_party/MuseTalk
+	url = https://github.com/smilinTux/MuseTalk.git
+	branch = feat/intel-xpu-device

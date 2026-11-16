@@ -1,0 +1,36 @@
+# Example unit: sklipsync, real-time lip-sync for skcall avatars.
+#
+# Assumes the export at ~/skcall with the service venv built by
+# `bash services/lipsync/sk/setup.sh`. Copy to ~/.config/systemd/user/, then:
+#   systemctl --user daemon-reload && systemctl --user enable --now sklipsync
+#
+# Settings go in ~/.config/sklipsync/sklipsync.env (mode 0600). systemd reads
+# a comment only on a line of its own, never after a value. For example:
+#   # the address your skcall hosts reach
+#   SKLIPSYNC_HOST=192.0.2.10
+#   # one client=token per line
+#   SKLIPSYNC_TOKENS_FILE=~/.config/sklipsync/tokens
+#   SKLIPSYNC_AVATARS=/path/to/avatars
+#   SKLIPSYNC_CACHE=/path/to/cache
+#   MUSETALK_MODELS=/path/to/models
+# On a multi-GPU Intel host, pick the card with ZE_AFFINITY_MASK (and
+# ONEAPI_DEVICE_SELECTOR); on NVIDIA, with CUDA_VISIBLE_DEVICES.
+[Unit]
+Description=sklipsync real-time lip-sync (MuseTalk)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/skcall/services/lipsync
+EnvironmentFile=%h/.config/sklipsync/sklipsync.env
+Environment=SKLIPSYNC_PORT=18850
+Environment=SKLIPSYNC_BATCH=8
+Environment=SKLIPSYNC_VRAM_GB=12
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/skcall/services/lipsync/.venv/bin/python -m sklipsync serve
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
