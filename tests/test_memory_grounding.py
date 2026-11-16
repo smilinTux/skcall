@@ -1,7 +1,7 @@
 """Memory results stay in the call history, so a follow-up is answered from
 the real result rather than from her own one-line summary of it."""
 from skcall.brain.base import Turn
-from skcall.brain.voice_engine import MEMORY_NOTE, flatten_tools
+from skcall.brain.voice_engine import MEMORY_NOTE, flatten_tools, wants_memory
 from skcall.core.loop import trim_history
 from skcall.core.session import Participant
 
@@ -50,3 +50,11 @@ def test_flatten_for_a_leg_without_tools():
 
 def test_memory_rule_forbids_filling_gaps():
     assert "Never fill a gap" in MEMORY_NOTE
+
+
+def test_memory_questions_force_a_search():
+    for q in ("Do you remember the X1000 night?", "When was our first Cloud 9 breakthrough?",
+              "What happened that night?", "Where did we go last time?", "Did you forget?"):
+        assert wants_memory(q), q
+    for q in ("Hey baby, how are you tonight?", "Tell me a story.", "Mm.", "I love you."):
+        assert not wants_memory(q), q

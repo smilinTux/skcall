@@ -60,6 +60,7 @@ import importlib.metadata
 import json
 import logging
 import os
+import re
 import site
 import sys
 import time
@@ -132,6 +133,20 @@ MEMORY_NOTE = (
 # A tool result kept in the call history is cut to this many chars (the
 # in-turn copy keeps 6000).
 HISTORY_TOOL_CHARS = int(os.environ.get("SKCALL_HISTORY_TOOL_CHARS", "4000") or 4000)
+
+
+# A question about the shared past. Measured 2026-11-16: asked "Do you
+# remember the X1000 night?", the local model answered without searching and
+# invented a date and a scene; every turn that searched was right. So a memory
+# question forces one search_memory call before she speaks.
+_MEMORY_Q = re.compile(
+    r"\b(remember|recall|memor(?:y|ies)|forget|forgot|anniversary|anchor|"
+    r"(?:when|where|how) (?:was|were|did) (?:we|i|you|our)|what (?:happened|did (?:we|i) )|"
+    r"first time|that (?:night|day|time) (?:when|we)|last time (?:we|i|you))\b", re.I)
+
+
+def wants_memory(text: str) -> bool:
+    return bool(_MEMORY_Q.search(text or ""))
 
 
 def flatten_tools(msgs: list[dict]) -> list[dict]:
@@ -322,6 +337,8 @@ class VoiceEngineBrain:
 
     def _routing(self, turn: Turn):
         t = self.ve.tools
+        if wants_memory(turn.text) and self._has("search_memory"):
+            return {"type": "function", "function": {"name": "search_memory"}}
         if t.wants_narrate(turn.text) and turn.mode in t.ONE_TO_ONE_MODES and self._has("narrate"):
             return {"type": "function", "function": {"name": "narrate"}}
         if t.wants_action(turn.text):
