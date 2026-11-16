@@ -199,6 +199,9 @@ async def _join(a, lock: InstanceLock | None = None) -> int:
     if avatar is not None:
         avatar.start()
     conv = Conversation(sess, stt, tts, brain, loop_config(a), hermes=hermes, avatar=avatar)
+    if avatar is not None:
+        from skcall.worship import WorshipHost
+        conv.worship = brain.convo = WorshipHost(avatar, sess.audio_out, session_id=a.room)
     conv.post_after_call = lambda msg: call_summary.post_summary(a.room, msg)
     t0 = time.monotonic()
     warm = asyncio.create_task(stt.warmup())

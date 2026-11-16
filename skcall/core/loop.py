@@ -244,6 +244,7 @@ class Conversation:
         # it): wraps the sink so each sentence is lip-synced and the first one
         # is held briefly for frames; fillers get their lips pre-rendered.
         self.avatar = avatar
+        self.worship = None       # WorshipHost: its narration yields when she answers
         self.sink = avatar.wrap_sink(session.audio_out) if avatar is not None else session.audio_out
         self.history: list[dict] = []
         self.timings: list[dict] = []
@@ -710,6 +711,8 @@ class Conversation:
                     continue
                 if not first_real.is_set():
                     first_real.set()
+                    if self.worship is not None:
+                        self.worship.yield_audio()
                     if filler_task is not None:
                         await asyncio.shield(filler_task)
                 st.spoke = True

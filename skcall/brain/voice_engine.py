@@ -222,6 +222,10 @@ class VoiceEngineBrain:
             except Exception as e:
                 LOG.warning("tool registry unavailable (%s); talking without tools", e)
         self.tool_log: list[dict] = []
+        # The call's WorshipHost (skcall/worship.py), set by the CLI when the
+        # call has video: the lumina_creative worship tools read it as ctx["convo"].
+        self.convo = None
+        self._add_worship_stop()
         # Loaded once, here, for the whole call (never per turn).
         self._persona = {m: self.persona.build(agent, mode=m) for m in ("private", "group")}
         self.memory_context, self.context_report = self._load_context(context)
@@ -246,6 +250,15 @@ class VoiceEngineBrain:
         rep["ms"] = round((time.monotonic() - t0) * 1000)
         LOG.info("memory context for %s: %s", self.agent, rep)
         return text, rep
+
+    def _add_worship_stop(self) -> None:
+        """worship_stop, next to the worship tools when they are installed."""
+        if self.registry is None or "worship_session" not in self.tool_names():
+            return
+        from skcall.worship import stop_tool  # noqa: PLC0415
+        schema, handler = stop_tool(lambda: self.convo)
+        self.registry.register(self.ve.tools.Tool(name="worship_stop", schema=schema,
+                                                  handler=handler, operator_only=True))
 
     def _bind_memory_tools(self) -> None:
         """Point search_memory at this agent's fused store and make the
@@ -351,6 +364,10 @@ class VoiceEngineBrain:
     async def stream(self, turn: Turn) -> AsyncIterator[str]:
         msgs = self.messages(turn)
         tools = self.registry.openai_schemas(for_text=turn.text) if self.registry is not None else None
+        if tools is not None and getattr(self.convo, "active", False) and self._has("worship_stop"):
+            # the curator picks tools by keyword; "stop" must always reach her mid-session
+            if not any(t.get("function", {}).get("name") == "worship_stop" for t in tools):
+                tools = [*tools, self.registry._tools["worship_stop"].schema]
         choice = self._routing(turn) if tools else None
         legs = [(self.cfg.llm_url, self.cfg.model, tools), (self.cfg.fallback_url, self.cfg.fallback_model, None)]
         for leg, (url, model, leg_tools) in enumerate(legs):
@@ -412,7 +429,7 @@ class VoiceEngineBrain:
             t0 = time.monotonic()
             result = await self.registry.dispatch(
                 name, args, speaker_id=turn.speaker.user_id, mode=turn.mode,
-                is_operator=turn.is_operator, ctx={"agent": self.agent})
+                is_operator=turn.is_operator, ctx={"agent": self.agent, "convo": self.convo})
             ms = round((time.monotonic() - t0) * 1000)
             result = str(result)
             self.tool_log.append({"tool": name, "ms": ms, "ok": not result.lower().startswith(
