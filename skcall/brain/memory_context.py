@@ -41,6 +41,9 @@ from pathlib import Path
 LOG = logging.getLogger("skcall.brain.memory")
 
 DEFAULT_BUDGET_TOKENS = 3000
+# Chars of each memory a search_memory result carries. Was 200, which left
+# the model a fragment to embroider (2026-11-16).
+SNIPPET_CHARS = 700
 # Measured on one gateway: whisper.md (3062 chars of markdown) added 1129
 # prompt tokens, i.e. ~2.7 chars per token. Budget in chars uses that ratio.
 CHARS_PER_TOKEN = 2.7
@@ -281,7 +284,7 @@ class AgentMemory:
         lines, seen = [], set()
         for r in results:
             title = (getattr(r, "title", "") or "").strip()
-            content = (getattr(r, "content", "") or "")[:200].strip().replace("\n", " ")
+            content = (getattr(r, "content", "") or "")[:SNIPPET_CHARS].strip().replace("\n", " ")
             if (title, content) in seen:
                 continue
             seen.add((title, content))
