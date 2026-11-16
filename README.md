@@ -133,6 +133,7 @@ Per agent (the canonical list is the docstring of `skcall/agents.py`):
 | `SKCALL_TTS_URL` | OpenAI-shaped `/v1/audio/speech` URL, or a comma list of servers with the same voice (required) |
 | `SKCALL_TTS_MODEL`, `SKCALL_TTS_VOICE`, `SKCALL_TTS_SPEED` | for example `f5-tts` with a cloned voice, or `tts-1` (Kokoro) with a stock voice; speed 0.5 to 2.0 |
 | `SKCALL_TTS_TOKEN` | bearer token sent to the TTS servers (unset: no header) |
+| `SKCALL_TTS_REF` | reference clip for a server that clones per request (ZONOS3-Mini on SGLang-Omni), sent as `references`; a path the TTS server can read |
 | `SKCALL_STT_BACKENDS` | ordered `kind:url` list, `fw:` (OpenAI-shaped) or `cpp:` (whisper.cpp); or `SKCALL_STT_URL` for one whisper.cpp (one of the two is required) |
 | `SKCALL_STT_TOKEN` | bearer token sent to every STT backend (unset: no header) |
 | `SKCALL_SITE_TURN` | the site's own TURN host, checked by `skcall smoke --turn` |

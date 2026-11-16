@@ -302,14 +302,21 @@ class F5TTS:
     `url` may be a comma list of servers that render the SAME voice (for
     example Kokoro on two hosts). They are tried in order; one that fails
     sits out `penalty_s` so later sentences go straight to the next. Never
-    list a server with a different voice: a call must not change voice."""
+    list a server with a different voice: a call must not change voice.
+
+    `ref` (default SKCALL_TTS_REF) is a reference clip for servers that clone
+    from audio per request (ZONOS3-Mini on SGLang-Omni): it is sent as
+    `references: [{"audio_path": ref}]`, a path the TTS server can read. Such a
+    server ignores `voice` when it gets a reference, and an F5 server ignores
+    `references`, so one request body serves both."""
 
     def __init__(self, url: str = TTS_URL, voice: str = os.environ.get("SKCALL_TTS_VOICE", "lumina"),
                  nfe_step: int | None = int(os.environ.get("SKCALL_TTS_NFE", "16")) or None,
                  timeout: float = 120, trim: bool = True,
                  model: str = os.environ.get("SKCALL_TTS_MODEL", "f5-tts"),
                  speed: float | None = None, penalty_s: float = 30.0, clock=time.monotonic,
-                 token: str | None = None, transport: httpx.AsyncBaseTransport | None = None):
+                 token: str | None = None, transport: httpx.AsyncBaseTransport | None = None,
+                 ref: str | None = None):
         """token: bearer token for the service (default SKCALL_TTS_TOKEN), sent
         to every server in `url`. transport: an httpx transport (tests)."""
         self.urls = [u.strip() for u in (url or TTS_URL).split(",") if u.strip()]
@@ -324,6 +331,7 @@ class F5TTS:
         self.model = model or "f5-tts"
         self.nfe_step = nfe_step if self.model.startswith("f5") else None
         self.speed = tts_speed() if speed is None else speed
+        self.ref = (os.environ.get("SKCALL_TTS_REF", "") if ref is None else ref).strip()
         token = os.environ.get("SKCALL_TTS_TOKEN", "") if token is None else token
         self._http = httpx.AsyncClient(timeout=timeout, headers=bearer(token), transport=transport)
 
@@ -335,6 +343,8 @@ class F5TTS:
             body["nfe_step"] = self.nfe_step
         if self.speed != 1.0:
             body["speed"] = self.speed
+        if self.ref:
+            body["references"] = [{"audio_path": self.ref}]
         content = await self._post(body)
         if content is None:
             return np.zeros(0, np.int16)
