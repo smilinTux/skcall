@@ -74,6 +74,10 @@ from skcall.video.lipsync import LipsyncClient
 
 CHECKS = ("tts", "stt", "lipsync", "talk", "turn")
 WORD = "Hello."
+# STT hears a sentence, not WORD: the first half second of a cloned voice is
+# often lost to the recognizer, which leaves a one-word clip nothing to match.
+STT_PHRASE = "Hello there, this is a quick speech test."
+STT_WANT = "speech test"
 CHECK_TIMEOUT_S = 120.0
 LIPSYNC_READY_S = 15.0
 TURN_TIMEOUT_S = 10.0
@@ -262,12 +266,12 @@ async def check_stt(agent: str) -> Result:
         problems, note = await _infos("stt", [b.url for b in backends])
         if problems:
             return False, "; ".join(problems)
-        pcm, _ = await _speak(agent, os.environ["SKCALL_TTS_URL"])
+        pcm, _ = await _speak(agent, os.environ["SKCALL_TTS_URL"], STT_PHRASE)
         if not len(pcm):
-            return False, f"no TTS audio for {WORD!r} to transcribe (SKCALL_TTS_URL, see the log)"
+            return False, f"no TTS audio for {STT_PHRASE!r} to transcribe (SKCALL_TTS_URL, see the log)"
         pcm16 = resample(pcm, CALL_RATE, STT_RATE)
         heard, bad = [], []
-        want = WORD.strip(".").lower()
+        want = STT_WANT
         for b in backends:
             t = time.monotonic()
             try:
@@ -277,7 +281,7 @@ async def check_stt(agent: str) -> Result:
                 continue
             ms = (time.monotonic() - t) * 1000
             if want not in text.lower():
-                bad.append(f"{_host(b.url)}: heard {text!r} for {WORD!r}")
+                bad.append(f"{_host(b.url)}: heard {text!r} for {STT_PHRASE!r}")
             else:
                 heard.append(f"{_host(b.url)} {text!r} {ms:.0f} ms")
         if bad:

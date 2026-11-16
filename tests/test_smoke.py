@@ -61,7 +61,7 @@ def env(monkeypatch, tmp_path):
 def fakes(monkeypatch):
     state = {"interface": {"tts": 1, "stt": 1, "lipsync": 1}, "settings": _settings("turn.example.org"),
              "rooms": [{"token": "room0001"}], "allocs": [], "requests": [], "down": set(),
-             "info": {}}
+             "info": {}, "heard": "This is a quick speech test."}
 
     def handler(req: httpx.Request) -> httpx.Response:
         state["requests"].append(req)
@@ -76,7 +76,7 @@ def fakes(monkeypatch):
             return httpx.Response(500, text="engine down")
         if svc == "tts":
             return httpx.Response(200, content=_wav())
-        return httpx.Response(200, json={"text": "Hello."})
+        return httpx.Response(200, json={"text": state["heard"]})
 
     monkeypatch.setattr(smoke, "_transport", lambda: httpx.MockTransport(handler))
 
@@ -393,3 +393,12 @@ def test_turn_allocation_timeout_names_the_turn_timeout(env, fakes, capsys):
     line = _lines(capsys.readouterr().out)[0]
     assert line.startswith("FAIL turn ") and "TURN allocation timed out after 0.05 s" in line
     assert "120" not in line
+
+
+def test_stt_matches_the_end_of_the_phrase_not_its_first_word(fakes, env):
+    """The recognizer often drops the first words of a cloned voice: hearing the
+    end of the phrase passes, a mishearing of it fails and says what was heard."""
+    fakes["heard"] = "this is a quick Speech Test."
+    assert cli.main(["smoke", "--tts", "--stt"]) == 0
+    fakes["heard"] = "Tess?"
+    assert cli.main(["smoke", "--tts", "--stt"]) == 1
