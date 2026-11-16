@@ -66,6 +66,22 @@ class VideoConfig:
                    av_offset_ms=int(e("SKCALL_AV_OFFSET_MS", "0")))
 
 
+class SceneOverlay:
+    """The published video source: her avatar, or a full-frame scene image
+    while one is shown (worship sessions, skcall/worship.py)."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.scene = None
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def frame(self, t: float):
+        s = self.scene
+        return s if s is not None else self.inner.frame(t)
+
+
 class Avatar:
     """Everything video for one call: the source the backend publishes, and
     (animated + service) the lip-sync client and audio wrapper."""
@@ -73,7 +89,7 @@ class Avatar:
     def __init__(self, cfg: VideoConfig, source, compositor: Compositor | None = None,
                  client: LipsyncClient | None = None):
         self.cfg = cfg
-        self.source = source
+        self.source = SceneOverlay(source)
         self.compositor = compositor
         self.client = client
         self.sink: LipsyncSink | None = None
@@ -104,6 +120,10 @@ class Avatar:
         LOG.info("video: animated %dx%d @%.0f fps, idle=%s blink=%s lipsync=%s", cfg.width, cfg.height,
                  cfg.fps, idle is not None, bool(idle and idle.can_blink), bool(client))
         return cls(cfg, comp, comp, client)
+
+    def show(self, frame) -> None:
+        """Put a scene (RGB uint8 at the source size) on the tile; None = her face."""
+        self.source.scene = frame
 
     def start(self) -> None:
         if self.client is not None:
@@ -145,5 +165,5 @@ class Avatar:
             await self.client.aclose()
 
 
-__all__ = ["Avatar", "VideoConfig", "Compositor", "LipsyncSink", "LipsyncClient", "IdleLoop",
+__all__ = ["Avatar", "SceneOverlay", "VideoConfig", "Compositor", "LipsyncSink", "LipsyncClient", "IdleLoop",
            "StaticPortrait", "load_portrait"]
