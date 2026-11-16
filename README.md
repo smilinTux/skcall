@@ -112,7 +112,18 @@ Nextcloud, rooms or operators: with no `SKCALL_NC_URL` it refuses to join. The
 example unit reads `~/.config/skcall/skcall.env`, then
 `~/.config/skcall/join.env` (optional host overrides), then
 `$XDG_RUNTIME_DIR/skcall/join-<room>.env` (per call: `SKCALL_RING`,
-`SKCALL_GREETING`).
+`SKCALL_GREETING`), then `~/.config/skcall/room-<room>.env` (standing
+settings for one room, read last so they win).
+
+A private room, for example: a `room-<room>.env` with its own model and no records.
+
+```sh
+SKVOICE_LLM_URL=http://localhost:18780/v1/chat/completions   # a local model
+SKVOICE_MODEL=<local model id>
+SKCALL_POST_SUMMARY=off      # no summary in the room's chat
+SKCALL_LOG_TRANSCRIPT=off    # logs keep timings, never the words
+SKCALL_HERMES=off            # no escalation (Hermes keeps its own sessions)
+```
 
 Which agent: every command takes `--agent`, and without it uses `SKAGENT`,
 else `lumina`. The example unit passes no `--agent`, so put
@@ -153,6 +164,8 @@ Host settings:
 | `SKCALL_SUMMARY_URL`, `SKCALL_SUMMARY_MODEL` | the OpenAI-shaped LLM that writes the post-call summary to the room chat (default `http://localhost:18780/v1`, model `sk-default`) |
 | `SKCALL_SUMMARY_KEY` | bearer token for that LLM (unset: no header) |
 | `SKCALL_POST_SUMMARY` | `on` (default) posts the summary; `off` turns it off |
+| `SKCALL_LOG_TRANSCRIPT` | `on` (default); `off`: log lines keep timings and lengths, never the words (heard text, tool arguments and results, Hermes requests) |
+| `SKCALL_HERMES` | `on` (default); `off`: never escalate to Hermes, like `--no-hermes` |
 | `SKCALL_MAX_CALL_S` | hard limit on call length (2 h; the example unit sets 24 h) |
 
 The voice layer's LLM legs come from skchat's `SKVOICE_LLM_URL`,

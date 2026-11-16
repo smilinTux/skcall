@@ -68,6 +68,7 @@ from typing import AsyncIterator
 
 import httpx
 
+from skcall.privacy import said
 from skcall.brain import memory_context
 from skcall.brain.base import Turn
 
@@ -362,8 +363,8 @@ class VoiceEngineBrain:
             result = str(result)
             self.tool_log.append({"tool": name, "ms": ms, "ok": not result.lower().startswith(
                 ("permission denied", "refused", f"{name} failed", "unknown tool"))})
-            LOG.info("tool %s(%s) -> %s [%d ms]", name, json.dumps(args)[:80],
-                     result[:100].replace("\n", " "), ms)
+            LOG.info("tool %s(%s) -> %s [%d ms]", name, said(json.dumps(args)[:80]),
+                     said(result[:100].replace("\n", " ")), ms)
             if name == "narrate" and len(result) > 80 and not result.lower().startswith("narrate"):
                 narrate = result
             msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": result[:6000]})

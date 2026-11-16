@@ -11,6 +11,8 @@
 #   NEXTCLOUD_TALK_USERNAME=<agent user>
 #   NEXTCLOUD_TALK_APP_PASSWORD=<app password>
 # Per-call options (ring, greeting) go in $XDG_RUNTIME_DIR/skcall/join-<room>.env.
+# Standing settings for one room (model, summary, logging, Hermes) go in
+# ~/.config/skcall/room-<room>.env, read last so they win.
 #
 # Copy to ~/.config/systemd/user/ and run `systemctl --user daemon-reload`.
 # Never enable it: it is started on demand. Deploy templates live in the
@@ -26,6 +28,7 @@ WorkingDirectory=%h
 EnvironmentFile=%h/.config/skcall/skcall.env
 EnvironmentFile=-%h/.config/skcall/join.env
 EnvironmentFile=-%t/skcall/join-%i.env
+EnvironmentFile=-%h/.config/skcall/room-%i.env
 Environment=SKCALL_VIDEO_MODE=animated
 Environment=SKCALL_MAX_CALL_S=86400
 Environment=PYTHONUNBUFFERED=1

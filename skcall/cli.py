@@ -31,6 +31,7 @@ import sys
 import time
 
 from skcall import summary as call_summary
+from skcall.privacy import hermes_enabled
 from skcall.agents import ConfigError, profile_for
 from skcall.core.loop import Conversation, LoopConfig
 from skcall.instance import (ALREADY_IN_CALL, EXIT_ALREADY_IN_CALL, AlreadyInCall, InstanceLock,
@@ -372,7 +373,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--no-barge-in", action="store_true")
         p.add_argument("--no-filler", action="store_true")
         p.add_argument("--no-tools", action="store_true", help="talk without her voice tools")
-        p.add_argument("--no-hermes", action="store_true", help="never escalate turns to Hermes")
+        p.add_argument("--no-hermes", action="store_true", default=not hermes_enabled(),
+                       help="never escalate turns to Hermes (default from SKCALL_HERMES)")
         p.add_argument("--no-mcp", action="store_true", help="built-in voice tools only, no MCP servers")
         p.add_argument("--no-video", action="store_true", help="audio only (also SKCALL_VIDEO=0)")
         p.add_argument("--video-mode", choices=("static", "animated"), default="",

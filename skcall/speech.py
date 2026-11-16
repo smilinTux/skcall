@@ -40,6 +40,7 @@ from typing import Protocol
 import httpx
 import numpy as np
 
+from skcall.privacy import said
 from skcall.agents import ConfigError
 from skcall.core.audio import CALL_RATE, STT_RATE, normalize_peak, pcm_to_wav, trim_silence, wav_to_pcm
 from skcall.core.text import is_whisper_repetition, too_many_words
@@ -120,7 +121,7 @@ class WhisperCppSTT:
         try:
             text = await self._post(wav, ctx)
             if ctx and text and (is_whisper_repetition(text) or too_many_words(text, secs)):
-                LOG.info("stt: degenerate at audio_ctx=%d (%r); retrying full", ctx, text[:60])
+                LOG.info("stt: degenerate at audio_ctx=%d (%r); retrying full", ctx, said(text[:60]))
                 self.retries += 1
                 text = await self._post(wav, 0)
         finally:

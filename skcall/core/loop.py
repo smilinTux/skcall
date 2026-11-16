@@ -38,6 +38,7 @@ from typing import Callable
 
 import numpy as np
 
+from skcall.privacy import said
 from skcall.brain.base import Brain, Turn
 from skcall.core.audio import CALL_RATE, FRAME_MS, STT_RATE, Reframer, resample, rms
 from skcall.core.session import (AudioTrack, CallEnded, CallSession, Participant,
@@ -553,11 +554,11 @@ class Conversation:
             tm.mark("stt")
             if not text or is_non_speech(text) or is_whisper_repetition(text):
                 if not prefix_text:
-                    LOG.info("ignored non-speech transcript %r", text)
+                    LOG.info("ignored non-speech transcript %r", said(text))
                     return
                 # 2026-10-26: a merged turn whose new tail was noise used to drop
                 # the earlier words too, so the request was never answered.
-                LOG.info("ignored non-speech tail %r; answering the merged words", text)
+                LOG.info("ignored non-speech tail %r; answering the merged words", said(text))
                 text = prefix_text
             elif prefix_text:
                 text = f"{prefix_text} {text}"
@@ -565,11 +566,11 @@ class Conversation:
             if text == prefix_text:
                 # the same words the cancelled turn already heard and noted;
                 # the dedup guard would drop them and nothing would answer
-                LOG.info("re-answering %s: %s", st.speaker.user_id, text)
+                LOG.info("re-answering %s: %s", st.speaker.user_id, said(text))
             else:
                 if self.dedup.is_duplicate(text):
                     return
-                LOG.info("heard %s: %s", st.speaker.user_id, text)
+                LOG.info("heard %s: %s", st.speaker.user_id, said(text))
                 self.note(st.speaker.display or st.speaker.user_id or "someone", text)
             if is_leave_command(text, self.cfg.agent_names, one_to_one=len(self.humans()) <= 1):
                 await self.speak_line(self.cfg.leave_line)
@@ -611,7 +612,7 @@ class Conversation:
         if len(self.history) > 40:
             self.history[:] = self.history[-30:]
         r = tm.report()
-        r["text"] = st.text[:80]
+        r["text"] = said(st.text[:80])
         self.timings.append(r)
         LOG.info("TURN %s", json.dumps(r))
 
@@ -755,7 +756,7 @@ class Conversation:
             # job queued behind the first (Hermes runs one turn per session).
             self.stats["hermes_not_stacked"] += 1
             tm.extra["path"] = "hermes-pending"
-            LOG.info("hermes job already pending for %r; not escalating %r", pending[:80], text[:80])
+            LOG.info("hermes job already pending for %r; not escalating %r", said(pending[:80]), said(text[:80]))
             ack = self.cfg.hermes_pending_line
         else:
             self.stats["hermes"] += 1
@@ -863,15 +864,15 @@ class Conversation:
             answer = ask.result()
         except asyncio.CancelledError:
             ask.cancel()
-            LOG.warning("Hermes job abandoned: %s", text[:80])
+            LOG.warning("Hermes job abandoned: %s", said(text[:80]))
             if self._ended.is_set():
                 await self._post_after_call(
                     f"{self.agent_display}: I was still working on \"{text[:200]}\" from the call "
                     f"and had to stop before Hermes answered.")
             raise
         took = self.clock() - t0
-        LOG.info("HERMES %s", json.dumps({"ms": round(took * 1000), "request": text[:80],
-                                           "answer": answer[:160], "after_call": self._ended.is_set(),
+        LOG.info("HERMES %s", json.dumps({"ms": round(took * 1000), "request": said(text[:80]),
+                                           "answer": said(answer[:160]), "after_call": self._ended.is_set(),
                                            "deferred": deferred}))
         self.history.append({"role": "assistant", "content": answer})
         self.note(self.agent_display, answer)
