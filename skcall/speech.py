@@ -34,6 +34,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import time
 from typing import Protocol
 
@@ -55,6 +56,18 @@ STT_URL = os.environ.get("SKCALL_STT_URL", "")
 # Without SKCALL_STT_BACKENDS, SKCALL_STT_URL alone is the one backend.
 STT_BACKENDS = os.environ.get("SKCALL_STT_BACKENDS", f"cpp:{STT_URL}" if STT_URL else "")
 TTS_URL = os.environ.get("SKCALL_TTS_URL", "")
+
+# A chunk with no letter or digit ("?", "...", a stray symbol) is not speech.
+_SPEAKABLE = re.compile(r"[^\W_]")
+
+
+def plausible_s(text: str) -> float:
+    """Longest a clip of `text` can plausibly run. Speech is 0.06 to 0.09 s per
+    character; a cloning TTS handed almost no text can run away instead.
+    Measured 2026-11-16 on ZONOS3-Mini: "a" became 4.6 to 6.1 s of invented
+    words, "?" 4.5 s, a lone symbol 5.7 s (whisper heard "He sewed fur-tidy
+    fresh stafet trees"), while the same inputs rendered fine on a retry."""
+    return 1.0 + 0.15 * len(text.strip())
 
 
 def bearer(token: str | None) -> dict[str, str]:
@@ -337,7 +350,10 @@ class F5TTS:
         self._http = httpx.AsyncClient(timeout=timeout, headers=bearer(token), transport=transport)
 
     async def synth(self, text: str) -> np.ndarray:
-        if not text.strip():
+        """One clip, or silence. Silence beats gibberish: a render longer than
+        `plausible_s(text)` is a runaway, so it is rendered again on the first
+        server, then on each other server once, and dropped if all run away."""
+        if not _SPEAKABLE.search(text or ""):
             return np.zeros(0, np.int16)
         body: dict = {"model": self.model, "input": text, "voice": self.voice, "response_format": "wav"}
         if self.nfe_step:
@@ -346,14 +362,26 @@ class F5TTS:
             body["speed"] = self.speed
         if self.ref:
             body["references"] = [{"audio_path": self.ref}]
-        content = await self._post(body)
-        if content is None:
-            return np.zeros(0, np.int16)
-        pcm = wav_to_pcm(content, CALL_RATE)
-        secs = len(pcm) / CALL_RATE
-        if len(text) > 40 and secs < len(text) * 0.02:
-            LOG.warning("TTS output looks truncated: %.2fs for %d chars", secs, len(text))
-        return trim_silence(normalize_peak(pcm), CALL_RATE) if self.trim else normalize_peak(pcm)
+        limit = plausible_s(text)
+        order = self._order()
+        failed: set[str] = set()
+        for url in order[:1] + order:
+            if url in failed:
+                continue
+            content = await self._post(body, [url])
+            if content is None:
+                failed.add(url)
+                continue
+            pcm = wav_to_pcm(content, CALL_RATE)
+            secs = len(pcm) / CALL_RATE
+            if secs > limit:
+                LOG.warning("TTS ran away: %.1f s for %d chars (limit %.1f s, url=%s)",
+                            secs, len(text), limit, url)
+                continue
+            if len(text) > 40 and secs < len(text) * 0.02:
+                LOG.warning("TTS output looks truncated: %.2fs for %d chars", secs, len(text))
+            return trim_silence(normalize_peak(pcm), CALL_RATE) if self.trim else normalize_peak(pcm)
+        return np.zeros(0, np.int16)
 
     def _order(self) -> list[str]:
         """Healthy servers first (in configured order), then benched ones as a last resort."""
@@ -361,8 +389,8 @@ class F5TTS:
         up = [u for u in self.urls if self._down_until.get(u, 0) <= now]
         return up + [u for u in self.urls if u not in up]
 
-    async def _post(self, body: dict) -> bytes | None:
-        for url in self._order():
+    async def _post(self, body: dict, urls: list[str] | None = None) -> bytes | None:
+        for url in self._order() if urls is None else urls:
             try:
                 r = await self._http.post(url, json=body)
                 r.raise_for_status()
