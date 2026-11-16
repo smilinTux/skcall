@@ -200,6 +200,25 @@ class _Listener:
     hb_peak: float = 0.0         # loudest frame since the last heartbeat
 
 
+# Messages kept in a call's history. A turn is 2 messages, or more with tool
+# results in it. Was a flat 40 (cut back to 30), which dropped every memory
+# result after its own turn; the call models take 131k tokens, so a long call
+# with many memory lookups (~1.5k tokens each) still fits.
+HISTORY_MAX = int(os.environ.get("SKCALL_HISTORY_MAX", "160") or 160)
+
+
+def trim_history(history: list[dict], cap: int) -> None:
+    """Cut `history` in place to at most ~3/4 of `cap` once it exceeds `cap`,
+    always starting at a user message, so a tool result is never left without
+    the assistant tool_calls message it answers."""
+    if len(history) <= cap:
+        return
+    keep = history[-max(2, cap * 3 // 4):]
+    while keep and keep[0].get("role") != "user":
+        keep.pop(0)
+    history[:] = keep
+
+
 @dataclass
 class _TurnState:
     speaker: Participant
@@ -209,6 +228,7 @@ class _TurnState:
     spoke: bool = False          # real reply audio has started (filler does not count)
     spoken: list[str] = field(default_factory=list)
     task: asyncio.Task | None = None
+    exchange: list[dict] = field(default_factory=list)
 
 
 class Conversation:
@@ -607,10 +627,9 @@ class Conversation:
         reply = " ".join(st.spoken)
         if tm.extra.get("cancelled"):
             reply += " (interrupted)"
-        self.history += [{"role": "user", "content": st.text},
+        self.history += [{"role": "user", "content": st.text}, *st.exchange,
                          {"role": "assistant", "content": reply}]
-        if len(self.history) > 40:
-            self.history[:] = self.history[-30:]
+        trim_history(self.history, HISTORY_MAX)
         r = tm.report()
         r["text"] = said(st.text[:80])
         self.timings.append(r)
@@ -630,6 +649,7 @@ class Conversation:
         turn = Turn(speaker=st.speaker, text=text, history=list(self.history), mode=self.mode(),
                     is_operator=st.speaker.user_id in self.cfg.operators,
                     participants=self.s.participants())
+        st.exchange = turn.exchange
         sentences: asyncio.Queue = asyncio.Queue()
         first_real = asyncio.Event()
         filler_task = asyncio.create_task(self._filler(text, first_real, tm)) if self.cfg.filler else None

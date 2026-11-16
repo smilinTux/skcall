@@ -117,6 +117,38 @@ HONESTY_NOTE = (
     "without guessing a number."
 )
 
+# Memory rule (2026-11-16): on the local model she answered memory questions
+# from a 200-char snippet and filled in the rest, and a follow-up had only her
+# own spoken summary to go on. Results now stay in the call history; this is
+# the instruction half.
+MEMORY_NOTE = (
+    "Memory rule: when you talk about something from your memory, say only what a memory "
+    "result in this conversation actually contains: names, dates, quotes and events. If the "
+    "result is thin or does not answer the question, say what it does say and that you do not "
+    "remember the rest, or search again with different words. Never fill a gap with a "
+    "plausible detail, and never present a guess as a memory."
+)
+
+# A tool result kept in the call history is cut to this many chars (the
+# in-turn copy keeps 6000).
+HISTORY_TOOL_CHARS = int(os.environ.get("SKCALL_HISTORY_TOOL_CHARS", "4000") or 4000)
+
+
+def flatten_tools(msgs: list[dict]) -> list[dict]:
+    """For a leg sent without tools: drop tool_calls messages and turn tool
+    results into plain user text, which every chat template accepts."""
+    out = []
+    for m in msgs:
+        if m.get("tool_calls"):
+            continue
+        if m.get("role") == "tool":
+            out.append({"role": "user", "content": "[Tool result, not said by the caller] "
+                        + str(m.get("content") or "")})
+            continue
+        out.append(m)
+    return out
+
+
 _FALLBACK_FILLERS = ("Mm.", "Mm-hm.", "Yeah.", "I'm here.", "Right.")
 MAX_TOOL_ROUNDS = 4
 
@@ -237,6 +269,7 @@ class VoiceEngineBrain:
                 text += "\n\n" + self.memory_context
             text += "\n\n" + TALK_NOTE
             text += "\n\n" + HONESTY_NOTE.format(tools=", ".join(self.tool_names()) or "none")
+            text += "\n\n" + MEMORY_NOTE
             if participants:
                 text += f" People in the call: {', '.join(participants)}."
             text += (f"\n\nRuntime fact: the model you run on is '{self.cfg.model}'. State that "
@@ -305,6 +338,8 @@ class VoiceEngineBrain:
         legs = [(self.cfg.llm_url, self.cfg.model, tools), (self.cfg.fallback_url, self.cfg.fallback_model, None)]
         for leg, (url, model, leg_tools) in enumerate(legs):
             got = False
+            if not leg_tools:
+                msgs = flatten_tools(msgs)
             try:
                 for rnd in range(MAX_TOOL_ROUNDS):
                     calls: dict = {}
@@ -347,7 +382,9 @@ class VoiceEngineBrain:
         tcs = [{"id": c["id"] or f"call_{i}", "type": "function",
                 "function": {"name": c["name"], "arguments": c["arguments"] or "{}"}}
                for i, c in sorted(calls.items())]
-        msgs.append({"role": "assistant", "content": None, "tool_calls": tcs})
+        call_msg = {"role": "assistant", "content": None, "tool_calls": tcs}
+        msgs.append(call_msg)
+        turn.exchange.append(call_msg)
         narrate = None
         for tc in tcs:
             name = tc["function"]["name"]
@@ -368,6 +405,8 @@ class VoiceEngineBrain:
             if name == "narrate" and len(result) > 80 and not result.lower().startswith("narrate"):
                 narrate = result
             msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": result[:6000]})
+            turn.exchange.append({"role": "tool", "tool_call_id": tc["id"],
+                                  "content": result[:HISTORY_TOOL_CHARS]})
         return narrate
 
     def filler(self, text: str) -> tuple[str, str]:

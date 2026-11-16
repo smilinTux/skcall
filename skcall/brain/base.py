@@ -16,6 +16,11 @@ class Turn:
     is_operator: bool = False
     participants: list[Participant] = field(default_factory=list)
     truncated: bool = False          # set by the brain if the token cap cut the reply
+    # Tool calls and results the brain made this turn (OpenAI message shape:
+    # assistant tool_calls, then role "tool"). The loop keeps them in the call
+    # history between the user line and the reply, so a follow-up question is
+    # answered from the real memory result, not from her one-line summary of it.
+    exchange: list[dict] = field(default_factory=list)
 
 
 class Brain(Protocol):
