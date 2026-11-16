@@ -23,6 +23,27 @@ from av import AudioFrame
 SR = 48000
 FRAME = 960  # 20 ms at 48 kHz
 
+# TURN permissions last 300 s (RFC 5766 sec 8) and a ChannelBind is what
+# refreshes them, but aioice 0.10 re-binds a channel only every 500 s. So from
+# minute 5 the TURN server drops her media, ICE consent expires 30 s later and
+# the publisher reconnects: measured 2026-11-16 as a drop every 5 min 49 s,
+# ~17 s of silence each, on every relayed call. Re-bind well inside 300 s.
+TURN_CHANNEL_REFRESH_S = 240
+
+
+def patch_turn_refresh(refresh_s: int = TURN_CHANNEL_REFRESH_S) -> None:
+    """Make every aioice TURN client re-bind its channels every `refresh_s`."""
+    from aioice import turn
+    cls = turn.TurnClientMixin
+    orig = getattr(cls, "_skcall_orig_init", cls.__init__)
+    cls._skcall_orig_init = orig
+
+    def init(self, *a, **kw):
+        orig(self, *a, **kw)
+        self.channel_refresh_time = min(self.channel_refresh_time, refresh_s)
+    cls.__init__ = init
+
+
 def patch_ice(relay_only: bool = False, ipv6: bool = False,
               iface_allow: tuple[str, ...] | None = None) -> None:
     """Process-wide aioice tweaks that aiortc 1.15 does not expose.
@@ -37,6 +58,7 @@ def patch_ice(relay_only: bool = False, ipv6: bool = False,
     import aioice
     from aioice import ice as aioice_ice
     from aiortc import rtcicetransport
+    patch_turn_refresh()
     kw = {"use_ipv6": ipv6}
     if relay_only:
         kw["transport_policy"] = aioice.TransportPolicy.RELAY
