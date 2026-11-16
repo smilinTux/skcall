@@ -24,6 +24,8 @@ Each field can be set from the environment:
   SKCALL_TTS_SPEED       speech rate sent as `speed` (1.0 default, clamped 0.5..2.0)
   SKCALL_TTS_URL         OpenAI-shaped /v1/audio/speech URL (required; see skcall.speech)
   SKCALL_TTS_TOKEN       bearer token sent to the TTS servers (unset: no header)
+  SKCALL_TTS_REF         reference clip sent as `references` (a path on the TTS server),
+                         for servers that clone per request such as ZONOS3-Mini
   SKCALL_STT_BACKENDS    STT backends, "kind:url" comma list (required, or SKCALL_STT_URL)
   SKCALL_STT_TOKEN       bearer token sent to every STT backend (unset: no header)
   SKCALL_SITE_TURN       the site's own TURN host; `skcall smoke --turn` fails when

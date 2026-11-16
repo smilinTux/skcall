@@ -220,6 +220,36 @@ def test_tts_body_per_model(monkeypatch):
     assert speech.F5TTS(url="http://a/x, http://b/x").urls == ["http://a/x", "http://b/x"]
 
 
+def test_tts_reference_clip_is_sent_as_references(monkeypatch):
+    """SKCALL_TTS_REF adds `references` and keeps `voice`, so an F5 fallback in the list still works."""
+    import asyncio
+    from skcall import speech
+    sent = []
+
+    class R:
+        content = b""
+
+        def raise_for_status(self):
+            pass
+
+    class H:
+        async def post(self, url, json):
+            sent.append(json)
+            return R()
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setenv("SKCALL_TTS_REF", " /voices/lumina.wav ")
+    t = speech.F5TTS(url="http://z/v1/audio/speech", voice="lumina", model="f5-tts", nfe_step=16)
+    t._http = H()
+    asyncio.run(t.synth("Hi."))
+    assert sent[0] == {"model": "f5-tts", "input": "Hi.", "voice": "lumina", "response_format": "wav",
+                       "nfe_step": 16, "references": [{"audio_path": "/voices/lumina.wav"}]}
+    monkeypatch.delenv("SKCALL_TTS_REF")
+    assert speech.F5TTS(url="http://z/x").ref == ""
+
+
 def test_known_eye_boxes_are_sane():
     from skcall.video.avatar import KNOWN_EYES
     assert "1597eede59685d3a" in KNOWN_EYES          # Jarvis's portrait.png
